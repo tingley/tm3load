@@ -193,9 +193,8 @@ public class TmImport {
         props.put("hibernate.connection.driver_class", "com.mysql.jdbc.Driver");
         props.put("hibernate.connection.url", 
                   "jdbc:mysql://localhost:3306/tm3?useUnicode=true&characterEncoding=UTF-8");
-        props.put("hibernate.connection.username", "tausdata");
-        props.put("hibernate.connection.password", "tau5Data!12");
-        props.put("hibernate.cglib.use_reflection_optimizer", "false"); // this is default in hibernate 3.2
+        props.put("hibernate.connection.username", "tm3");
+        props.put("hibernate.connection.password", "tm3");
         props.put("hibernate.show_sql", "false");
         props.put("hibernate.format_sql", "true");
         // For debug
