@@ -39,8 +39,8 @@ public class TmFuzzyLookup {
             TM3Locale tgtLocale = 
                 factory.getLocaleByCode(session, "fr-FR");
             
-            TM3Manager manager = DefaultManager.create();
-            TM3Tm<Data> tm = manager.getTm(session, factory, tmId);
+            TM3Manager<Data> manager = DefaultManager.create(session);
+            TM3Tm<Data> tm = manager.getTm(factory, tmId);
             System.out.println("Got tm " + tm.getId());
             Joiner joiner = Joiner.on(' ');
             //String s = joiner.join(Arrays.asList(args).subList(1, args.length - 1));

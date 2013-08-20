@@ -158,8 +158,8 @@ public class TmImport {
                 usage();
             }
 	        
-	        TM3Manager manager = DefaultManager.create();
-	        TM3Tm<Data> tm = manager.getTm(session, factory, tmId);
+	        TM3Manager<Data> manager = DefaultManager.create(session);
+	        TM3Tm<Data> tm = manager.getTm(factory, tmId);
             if (tm == null) {
                 System.out.println("No such TM " + tmId);
                 usage();
