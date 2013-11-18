@@ -31,6 +31,11 @@ public class TmxImporter {
 			throws IOException, XMLStreamException, SNAXUserException {
 		Reader r = new BufferedReader(
 				new InputStreamReader(new FileInputStream(tmxFile), "UTF-8"));
+		// Skip the BOM
+		r.mark(1);
+		if ((char)r.read() != '\uFEFF') {
+			r.reset();
+		}
 		
 		// XXX Simplified version of the TmxReaderThread logic.
 		// This assumes that the input data is a lot more sane -- that it's only

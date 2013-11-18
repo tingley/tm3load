@@ -45,7 +45,7 @@ public class TmImport {
 		this.batchSize = batchSize;
 		tx = session.beginTransaction();
 		try {
-            this.event = tm.addEvent(0, "tingley", 
+            this.event = tm.addEvent(0, "TmImport", 
                                      "Import of " + tmxFile.getName());
 			startTime = System.currentTimeMillis();
 			lastTime = startTime;
@@ -186,6 +186,7 @@ public class TmImport {
 		}
 	}
 
+	// TODO: read from properties, ideally tm3tool properties
 	public static SessionFactory setupHibernate() {
 	    long start = System.currentTimeMillis();
 	    Properties props = new Properties();
