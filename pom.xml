@@ -12,7 +12,15 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  	<okapi.version>0.23</okapi.version>
   </properties>
+
+  <repositories>
+    <repository>
+      <id>okapi-release</id>
+      <url>http://repository-okapi.forge.cloudbees.com/release/</url>
+    </repository>
+  </repositories>
 
   <dependencies>
     <dependency>
@@ -41,6 +49,11 @@
         <artifactId>cli</artifactId>
         <version>7</version>
     </dependency>
+  	<dependency>
+  		<groupId>net.sf.okapi.filters</groupId>
+  		<artifactId>okapi-filter-xliff</artifactId>
+  		<version>${okapi.version}</version>
+  	</dependency>
   </dependencies>
 
   <build>
