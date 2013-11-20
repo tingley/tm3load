@@ -7,8 +7,13 @@ import java.util.Map;
 import java.util.Properties;
 
 import net.sundell.snax.SNAXUserException;
+
 import javax.xml.stream.Location;
 
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.OptionBuilder;
+import org.apache.commons.cli.Options;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
@@ -16,12 +21,13 @@ import org.hibernate.cfg.Configuration;
 
 import com.globalsight.ling.tm3.core.*;
 import com.globalsight.ling.tm3.core.persistence.HibernateConfig;
-
+import com.globalsight.ling.tm3.tools.TM3Command;
 import com.spartansoftwareinc.tm3load.data.*;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
-public class TmImport {
+@SuppressWarnings("static-access")
+public class TmImport extends TM3Command {
 
 	private int batchSize;
 	private TM3Tm<Data> tm;
@@ -29,21 +35,58 @@ public class TmImport {
 	private long startTime;
 	private long lastTime;
 	private Session session;
-	private Transaction tx = null;
 	private static TM3Locale srcLocale, tgtLocale;
 	
-	public TmImport(Session session, TM3Tm<Data> tm) {
-	    this.session = session;
-	    this.tm = tm;
+	@Override
+	public String getDescription() {
+		return "import a TMX file into the specified TM";
 	}
 
+	@Override
+	public String getName() {
+		return "import";
+	}
+
+	static final String TM = "tm";
+    static final Option TM_OPT = OptionBuilder.withArgName("tm")
+                        .hasArg()
+                        .withDescription("ID of the TM to leverage against")
+                        .isRequired()
+                        .create(TM);
+                        
+    @Override
+    public Options getOptions() {
+        Options opts = getDefaultOptions();
+        opts.addOption(TM_OPT);
+        return opts;
+    }
+	
+    // TODO: why did it want src/tgt locale?
+    //"Usage: Usage: TmImport [id] [srclocale] [tgtlocale] [file]"
+    @Override
+    protected String getUsageLine() {
+        return getName() + " [options] -" + TM + " tmId [tmx file] [tmx file] ...";
+    }
+    
+    @Override
+    protected boolean requiresDataFactory() {
+    	return true;
+    }
+
+	// TODO: use otter
+    // Hmm: The wstx parser used by okapi is picked up by snax as well.
+    // It is trying to load the DTD!  Does the built-in eventreader do this?
+    /*
+     * com.ctc.wstx.exc.WstxParsingException: (was java.io.FileNotFoundException) 
+     * /Users/chase/Documents/src/tm3load/tmx14.dtd (No such file or directory)
+     * org.codehaus.stax2.ri.Stax2EventReaderImpl
+     */
 	public void doImport(File tmxFile, int batchSize) throws Exception {
 	    if (tm == null) {
 	        throw new IllegalStateException("setTm() was never called");
 	    }
 	    // TODO: load src, tgt locales
 		this.batchSize = batchSize;
-		tx = session.beginTransaction();
 		try {
             this.event = tm.addEvent(0, "TmImport", 
                                      "Import of " + tmxFile.getName());
@@ -53,7 +96,6 @@ public class TmImport {
 			TmImportListener listener = new TmImportListener();
 			importer.process(listener);
 			listener.flush();
-			tx.commit();
 			System.out.println("Imported " + listener.getCount() + " TUs in " + 
 			(System.currentTimeMillis() - startTime) + "ms");
 		}
@@ -63,20 +105,8 @@ public class TmImport {
             System.err.println("at line " + location.getLineNumber() + 
                 " col " + location.getColumnNumber());
 			e.printStackTrace();
-			if (tx != null) {
-				tx.rollback();
-			}
-		}
-		catch (Exception e) {
-			e.printStackTrace();
-			if (tx != null) {
-				tx.rollback();
-			}
 		}
 	}
-
-    static int nextAttrValue = 0;
-    static TM3Attribute attr = null;
 
 	class TmImportListener implements TmxImporter.ImportListener {
 		private int count = 0;
@@ -98,14 +128,9 @@ public class TmImport {
                     tgts.put(tgtLocale, new Data(tuv.getSegment(), tgtLocale));
                 }
                 long s = System.currentTimeMillis();
-                String prefix = (contentPrefix != null) ? 
-                        contentPrefix + " " : "";
-                Map<TM3Attribute, Object> attrs = (attr == null) ?
-                    TM3Attributes.NONE :
-                    TM3Attributes.one(attr, "" + nextAttrValue++);
-                nextAttrValue %= 4;
+                Map<TM3Attribute, Object> attrs = TM3Attributes.NONE;
                 TM3Tu<Data> dbtu = tm.save(srcLocale, 
-                    new Data(prefix +  tu.getSourceTuv().getSegment(), srcLocale), 
+                    new Data(tu.getSourceTuv().getSegment(), srcLocale), 
                     attrs, tgts, TM3SaveMode.MERGE, event);
                 long e = System.currentTimeMillis();
                 long delta = e - s;
@@ -115,8 +140,7 @@ public class TmImport {
                             tu.getSourceTuv().getSegment().length());
                 }
 		    }
-	        tx.commit();
-	        tx = session.beginTransaction();
+		    commitAndRestartTransaction();
 			tus.clear();
 			long time = System.currentTimeMillis();
 			System.out.println("" + count + " took " + (time - lastTime) + "ms");
@@ -128,85 +152,28 @@ public class TmImport {
 		}
 	}
 
-    private static void usage() {
-        System.err.println(
-            "Usage: Usage: TmImport [id] [srclocale] [tgtlocale] [file]");
-        System.exit(1);
-    }
+	@Override
+	protected void handle(Session session, CommandLine command) throws Exception {
+		String[] args = command.getArgs();
+		if (args.length == 0) usage(); 
+		String s = command.getOptionValue(TM);
+		
+		DataFactory factory = new DataFactory();
+        
+		// TODO: get these from command line or something
+        srcLocale = factory.getLocaleByCode(session, "en_US");
+        tgtLocale = factory.getLocaleByCode(session, "fr_FR");
 
-    private static String contentPrefix = "";
+        this.session = session;
+		this.tm = getTm(s);
 
-	public static void main(String[] args) {
-        if (args.length < 4 || args.length > 5) {
-            usage();
-        }
-        long tmId = -1;
-        try {
-            tmId = Long.valueOf(args[0]);
-        }
-        catch (Exception e) {}
-        if (tmId == -1) {
-            usage();
-        }
-	    try {
-	        SessionFactory sessionFactory = setupHibernate();
-	        Session session = sessionFactory.openSession();
-            DataFactory factory = new DataFactory();
-            srcLocale = factory.getLocaleByCode(session, args[1]);
-            tgtLocale = factory.getLocaleByCode(session, args[2]);
-            if (srcLocale == null || tgtLocale == null) {
-                usage();
-            }
-	        
-	        TM3Manager<Data> manager = DefaultManager.create(session);
-	        TM3Tm<Data> tm = manager.getTm(factory, tmId);
-            if (tm == null) {
-                System.out.println("No such TM " + tmId);
-                usage();
-            }
-            attr = tm.getAttributeByName("test");
-            if (attr != null) {
-                System.out.println("Using attribute 'test'");
-            }
-            TmImport importer = new TmImport(session, tm);
-    		File tmxFile = new File(args[3]);
+		for (String arg : args) {
+			File tmxFile = new File(arg);
     		if (!tmxFile.exists() || tmxFile.isDirectory()) {
-    			System.err.println("Not a file: " + tmxFile);
-    			System.exit(1);
+    			die("Not a file: " + tmxFile);
     		}
     		System.out.println("Importing from " + tmxFile);
-            if (args.length == 5) {
-                contentPrefix = args[4];
-                System.out.println("Using TUV content prefix '" + 
-                                   contentPrefix + "'");
-            }
-			importer.doImport(tmxFile, 100);
-		} catch (Exception e) {
-			e.printStackTrace();
+			doImport(tmxFile, 100);
 		}
 	}
-
-	// TODO: read from properties, ideally tm3tool properties
-	public static SessionFactory setupHibernate() {
-	    long start = System.currentTimeMillis();
-	    Properties props = new Properties();
-        props.put("hibernate.dialect", "org.hibernate.dialect.MySQLInnoDBDialect");
-        props.put("hibernate.connection.driver_class", "com.mysql.jdbc.Driver");
-        props.put("hibernate.connection.url", 
-                  "jdbc:mysql://localhost:3306/tm3?useUnicode=true&characterEncoding=UTF-8");
-        props.put("hibernate.connection.username", "tm3");
-        props.put("hibernate.connection.password", "tm3");
-        props.put("hibernate.show_sql", "false");
-        props.put("hibernate.format_sql", "true");
-        // For debug
-        props.put("hibernate.connection.pool_size", "1");
-        Configuration cfg = new Configuration().addProperties(props);
-        cfg = HibernateConfig.extendConfiguration(cfg);
-        cfg = new DataFactory().extendConfiguration(cfg);
-        SessionFactory sessionFactory = cfg.buildSessionFactory();
-        System.out.println("Hibernate initialization took " + 
-                           (System.currentTimeMillis() - start) + "ms");
-        return sessionFactory;
-	}
-
 }

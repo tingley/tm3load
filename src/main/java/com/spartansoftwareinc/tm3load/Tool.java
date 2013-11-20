@@ -14,6 +14,7 @@ public class Tool extends TM3Tool {
 	@Override
 	protected void registerCustomCommands(
             Map<String, Class<? extends TM3Command>> commands) {
+		commands.put("import", TmImport.class);
 		commands.put("leverage", TmBulkFuzzy.class);
 	}
 }

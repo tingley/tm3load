@@ -17,15 +17,11 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
 import org.hibernate.Session;
-import org.hibernate.SessionFactory;
-
 import com.spartansoftwareinc.tm3load.data.*;
-import com.globalsight.ling.tm3.core.DefaultManager;
 import com.globalsight.ling.tm3.core.TM3Attributes;
 import com.globalsight.ling.tm3.core.TM3LeverageMatch;
 import com.globalsight.ling.tm3.core.TM3LeverageResults;
 import com.globalsight.ling.tm3.core.TM3Locale;
-import com.globalsight.ling.tm3.core.TM3Manager;
 import com.globalsight.ling.tm3.core.TM3MatchType;
 import com.globalsight.ling.tm3.core.TM3Tm;
 import com.globalsight.ling.tm3.core.TM3Tuv;

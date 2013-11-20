@@ -12,6 +12,7 @@ import java.util.Collections;
 
 public class TmFuzzyLookup {
 
+	// This is broken
     public static void main(String[] args) {
         try {
             if (args.length < 2) {
@@ -29,7 +30,7 @@ public class TmFuzzyLookup {
             String attrVal = null;
             //String attrVal = args[args.length - 1];
             
-            SessionFactory sessionFactory = TmImport.setupHibernate();
+            SessionFactory sessionFactory = null; // TmImport.setupHibernate();
             Session session = sessionFactory.openSession();
 
             DataFactory factory = new DataFactory();
