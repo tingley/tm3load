@@ -7,17 +7,25 @@ import com.globalsight.ling.tm3.core.TM3Locale;
  */
 public enum Locale implements TM3Locale {
 
-    EN(1, "en", "US"),
-    FR(2, "fr", "FR"),
-    DE(3, "de", "DE"),
-    ES(4, "es", "ES"),
-    JP(5, "jp", "JP"),
-    ZH(6, "zh", "CN");
+    EN_US(1, "en", "US"),
+    FR_FR(2, "fr", "FR"),
+    DE_DE(3, "de", "DE"),
+    ES_ES(4, "es", "ES"),
+    JP_JP(5, "jp", "JP"),
+    ZH_CN(6, "zh", "CN"),
+    EN(7, "en"),
+    FR(8, "fr");
     
     private long id;
     private String language;
     private String locale;
     private String code;
+    
+    Locale(long id, String language) {
+    	this.id = id;
+    	this.language = language;
+    	this.code = language;
+    }
     
     Locale(long id, String language, String locale) {
         this.id = id;

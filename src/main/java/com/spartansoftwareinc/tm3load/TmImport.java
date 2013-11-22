@@ -22,6 +22,10 @@ import org.hibernate.cfg.Configuration;
 import com.globalsight.ling.tm3.core.*;
 import com.globalsight.ling.tm3.core.persistence.HibernateConfig;
 import com.globalsight.ling.tm3.tools.TM3Command;
+import com.spartansoftwareinc.otter.TU;
+import com.spartansoftwareinc.otter.TUV;
+import com.spartansoftwareinc.otter.TUVContent;
+import com.spartansoftwareinc.otter.TextContent;
 import com.spartansoftwareinc.tm3load.data.*;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -34,8 +38,6 @@ public class TmImport extends TM3Command {
     private TM3Event event;
 	private long startTime;
 	private long lastTime;
-	private Session session;
-	private static TM3Locale srcLocale, tgtLocale;
 	
 	@Override
 	public String getDescription() {
@@ -73,7 +75,6 @@ public class TmImport extends TM3Command {
     	return true;
     }
 
-	// TODO: use otter
     // Hmm: The wstx parser used by okapi is picked up by snax as well.
     // It is trying to load the DTD!  Does the built-in eventreader do this?
     /*
@@ -110,10 +111,19 @@ public class TmImport extends TM3Command {
 
 	class TmImportListener implements TmxImporter.ImportListener {
 		private int count = 0;
-		private List<Tu> tus = Lists.newArrayList();
+		private List<TU> tus = Lists.newArrayList();
+		private Locale srcLocale;
 		
 		@Override
-		public void processTu(Tu tu) throws SQLException {
+		public void setSrcLang(String lang) {
+			srcLocale = Locale.byCode(lang);
+			if (srcLocale == null) {
+				throw new IllegalStateException("Unsupported source locale: " + lang);
+			}
+		}
+		
+		@Override
+		public void processTu(TU tu) throws SQLException {
 			tus.add(tu);
 			count++;
 			if (tus.size() >= batchSize) {
@@ -122,22 +132,44 @@ public class TmImport extends TM3Command {
 		}
 		
 		public void flush() throws SQLException {
-		    for (Tu tu : tus) {
+			if (srcLocale == null) {
+				throw new IllegalStateException("No srcLang declared in TMX header!");
+			}
+		    for (TU tu : tus) {
 		        Map<TM3Locale, Data> tgts = Maps.newHashMap();
-                for (Tuv tuv : tu.getTargetTuvs()) {
-                    tgts.put(tgtLocale, new Data(tuv.getSegment(), tgtLocale));
-                }
+		        String srcTuvContent = null;
+		        for (Map.Entry<String, TUV> entry : tu.getTuvs().entrySet()) {
+		        	// XXX HACK: exclude english
+		        	if (entry.getKey().equalsIgnoreCase(srcLocale.toString())) {
+		        		srcTuvContent = flatten(entry.getValue());
+		        		System.out.println("src content: " + srcTuvContent);
+		        		continue;
+		        	}
+		        	// XXX I'm now ignoring the hardcoded tgtLocale
+		        	Locale targetLocale = Locale.byCode(entry.getKey());
+		        	if (targetLocale == null) {
+		        		throw new IllegalStateException("Unsupported locale: " + entry.getKey());
+		        	}
+		        	String tgtSeg = flatten(entry.getValue());
+		        	System.out.println("Tgt tuv: " + tgtSeg);
+		        	tgts.put(targetLocale, new Data(tgtSeg, targetLocale));
+		        }
+		        // If there was no src, just skip it
+		        if (srcTuvContent == null) {
+		        	System.out.println("Skipping TU with no source: " + tu);
+		        	continue;
+		        }
                 long s = System.currentTimeMillis();
                 Map<TM3Attribute, Object> attrs = TM3Attributes.NONE;
                 TM3Tu<Data> dbtu = tm.save(srcLocale, 
-                    new Data(tu.getSourceTuv().getSegment(), srcLocale), 
+                    new Data(srcTuvContent, srcLocale), 
                     attrs, tgts, TM3SaveMode.MERGE, event);
                 long e = System.currentTimeMillis();
                 long delta = e - s;
                 if (delta > 20) {
                     System.out.println("Slow save (" + delta + "ms) for " +
                             " TU " + tu.getId() + ", DBTU " + dbtu.getId() + " srclen " + 
-                            tu.getSourceTuv().getSegment().length());
+                            srcTuvContent.length());
                 }
 		    }
 		    commitAndRestartTransaction();
@@ -152,6 +184,20 @@ public class TmImport extends TM3Command {
 		}
 	}
 
+	private String flatten(TUV tuv) {
+		StringBuilder sb = new StringBuilder();
+		int nextTagId = 1;
+		for (TUVContent c : tuv.getContents()) {
+			if (c instanceof TextContent) {
+				sb.append(((TextContent)c).getValue());
+			}
+			else {
+				sb.append("{").append("" + nextTagId++).append("}");
+			}
+		}
+		return sb.toString();
+	}
+	
 	@Override
 	protected void handle(Session session, CommandLine command) throws Exception {
 		String[] args = command.getArgs();
@@ -159,12 +205,7 @@ public class TmImport extends TM3Command {
 		String s = command.getOptionValue(TM);
 		
 		DataFactory factory = new DataFactory();
-        
-		// TODO: get these from command line or something
-        srcLocale = factory.getLocaleByCode(session, "en_US");
-        tgtLocale = factory.getLocaleByCode(session, "fr_FR");
 
-        this.session = session;
 		this.tm = getTm(s);
 
 		for (String arg : args) {
