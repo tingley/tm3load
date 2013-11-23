@@ -4,8 +4,6 @@ import java.io.File;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
-
 import net.sundell.snax.SNAXUserException;
 
 import javax.xml.stream.Location;
@@ -15,12 +13,7 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
 import org.hibernate.Session;
-import org.hibernate.SessionFactory;
-import org.hibernate.Transaction;
-import org.hibernate.cfg.Configuration;
-
 import com.globalsight.ling.tm3.core.*;
-import com.globalsight.ling.tm3.core.persistence.HibernateConfig;
 import com.globalsight.ling.tm3.tools.TM3Command;
 import com.spartansoftwareinc.otter.TU;
 import com.spartansoftwareinc.otter.TUV;
@@ -75,18 +68,10 @@ public class TmImport extends TM3Command {
     	return true;
     }
 
-    // Hmm: The wstx parser used by okapi is picked up by snax as well.
-    // It is trying to load the DTD!  Does the built-in eventreader do this?
-    /*
-     * com.ctc.wstx.exc.WstxParsingException: (was java.io.FileNotFoundException) 
-     * /Users/chase/Documents/src/tm3load/tmx14.dtd (No such file or directory)
-     * org.codehaus.stax2.ri.Stax2EventReaderImpl
-     */
 	public void doImport(File tmxFile, int batchSize) throws Exception {
 	    if (tm == null) {
 	        throw new IllegalStateException("setTm() was never called");
 	    }
-	    // TODO: load src, tgt locales
 		this.batchSize = batchSize;
 		try {
             this.event = tm.addEvent(0, "TmImport", 
@@ -139,19 +124,15 @@ public class TmImport extends TM3Command {
 		        Map<TM3Locale, Data> tgts = Maps.newHashMap();
 		        String srcTuvContent = null;
 		        for (Map.Entry<String, TUV> entry : tu.getTuvs().entrySet()) {
-		        	// XXX HACK: exclude english
 		        	if (entry.getKey().equalsIgnoreCase(srcLocale.toString())) {
 		        		srcTuvContent = flatten(entry.getValue());
-		        		System.out.println("src content: " + srcTuvContent);
 		        		continue;
 		        	}
-		        	// XXX I'm now ignoring the hardcoded tgtLocale
 		        	Locale targetLocale = Locale.byCode(entry.getKey());
 		        	if (targetLocale == null) {
 		        		throw new IllegalStateException("Unsupported locale: " + entry.getKey());
 		        	}
 		        	String tgtSeg = flatten(entry.getValue());
-		        	System.out.println("Tgt tuv: " + tgtSeg);
 		        	tgts.put(targetLocale, new Data(tgtSeg, targetLocale));
 		        }
 		        // If there was no src, just skip it
@@ -204,8 +185,6 @@ public class TmImport extends TM3Command {
 		if (args.length == 0) usage(); 
 		String s = command.getOptionValue(TM);
 		
-		DataFactory factory = new DataFactory();
-
 		this.tm = getTm(s);
 
 		for (String arg : args) {
